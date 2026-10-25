@@ -67,7 +67,14 @@
       min-height: 80px;
     }
 
-    .embed-section {
+    .section-title {
+      font-size: 1rem;
+      color: #fff;
+      margin-bottom: 12px;
+      font-weight: 600;
+    }
+
+    .embed-section, .attachment-section {
       border: 1px dashed var(--border-color);
       padding: 16px;
       border-radius: 8px;
@@ -131,7 +138,7 @@
   
   <div class="form-group">
     <label for="webhookUrl">Webhook URL *</label>
-    <input type="url" id="webhookUrl" placeholder="https://your-yapin-server.com/api/webhooks/..." required />
+    <input type="url" id="webhookUrl" placeholder="https://yapin.gg/api/webhooks/..." required />
   </div>
 
   <div class="form-group">
@@ -146,12 +153,27 @@
 
   <div class="form-group">
     <label for="content">Main Message Content</label>
-    <textarea id="content" placeholder="Type your yapping message here..."></textarea>
+    <textarea id="content" placeholder="Type your message here..."></textarea>
+  </div>
+
+  <!-- ATTACHMENTS & IMAGE URL SECTION -->
+  <div class="attachment-section">
+    <div class="section-title">🖼️ Message Attachments & Image Links</div>
+
+    <div class="form-group">
+      <label for="fileInput">Upload Local File / Image (Attachment)</label>
+      <input type="file" id="fileInput" />
+    </div>
+
+    <div class="form-group">
+      <label for="messageImageUrl">Message Image URL (Direct Link)</label>
+      <input type="url" id="messageImageUrl" placeholder="https://example.com/image.png" />
+    </div>
   </div>
 
   <!-- EMBED BUILDER SECTION -->
   <div class="embed-section">
-    <label style="font-size: 1rem; color: #fff; margin-bottom: 12px;">Rich Embed Card</label>
+    <div class="section-title">✨ Rich Embed Card</div>
     
     <div class="flex-row">
       <div class="form-group" style="flex: 1;">
@@ -180,6 +202,18 @@
       </div>
     </div>
 
+    <!-- EMBED IMAGES -->
+    <div class="flex-row">
+      <div class="form-group" style="flex: 1;">
+        <label for="embedImageUrl">Embed Main Image URL</label>
+        <input type="url" id="embedImageUrl" placeholder="https://example.com/main-banner.png" />
+      </div>
+      <div class="form-group" style="flex: 1;">
+        <label for="embedThumbnailUrl">Embed Thumbnail URL</label>
+        <input type="url" id="embedThumbnailUrl" placeholder="https://example.com/small-icon.png" />
+      </div>
+    </div>
+
     <div class="form-group">
       <label for="embedFooter">Footer Text</label>
       <input type="text" id="embedFooter" placeholder="Sent via Yapin Webhook Web" />
@@ -200,37 +234,44 @@
       return;
     }
 
-    // Convert hex color string to integer (Standard Webhook format)
     const hexColor = document.getElementById('embedColor').value.replace('#', '');
     const colorInt = parseInt(hexColor, 16);
 
-    // Build Payload
     const payload = {};
 
     const username = document.getElementById('username').value.trim();
     const avatarUrl = document.getElementById('avatarUrl').value.trim();
     const content = document.getElementById('content').value.trim();
+    const messageImageUrl = document.getElementById('messageImageUrl').value.trim();
 
     if (username) payload.username = username;
     if (avatarUrl) payload.avatar_url = avatarUrl;
-    if (content) payload.content = content;
+    
+    // Combine text content and direct message image link if provided
+    let finalContent = content;
+    if (messageImageUrl) {
+      finalContent = finalContent ? `${finalContent}\n${messageImageUrl}` : messageImageUrl;
+    }
+    if (finalContent) payload.content = finalContent;
 
-    // Check if embed fields have content
+    // Build Embed
     const embedTitle = document.getElementById('embedTitle').value.trim();
     const embedDesc = document.getElementById('embedDesc').value.trim();
     const fieldTitle = document.getElementById('fieldTitle').value.trim();
     const fieldValue = document.getElementById('fieldValue').value.trim();
     const embedFooter = document.getElementById('embedFooter').value.trim();
+    const embedImageUrl = document.getElementById('embedImageUrl').value.trim();
+    const embedThumbnailUrl = document.getElementById('embedThumbnailUrl').value.trim();
 
-    if (embedTitle || embedDesc || fieldTitle || embedFooter) {
-      const embed = {
-        color: colorInt
-      };
+    if (embedTitle || embedDesc || fieldTitle || embedFooter || embedImageUrl || embedThumbnailUrl) {
+      const embed = { color: colorInt };
 
       if (embedTitle) embed.title = embedTitle;
       if (embedDesc) embed.description = embedDesc;
       if (embedFooter) embed.footer = { text: embedFooter };
-      
+      if (embedImageUrl) embed.image = { url: embedImageUrl };
+      if (embedThumbnailUrl) embed.thumbnail = { url: embedThumbnailUrl };
+
       if (fieldTitle && fieldValue) {
         embed.fields = [
           {
@@ -244,20 +285,37 @@
       payload.embeds = [embed];
     }
 
-    // Ensure payload isn't completely empty
-    if (!payload.content && !payload.embeds) {
-      showStatus("Please provide message content or fill in the embed details.", false);
+    const fileInput = document.getElementById('fileInput');
+    const hasFile = fileInput.files.length > 0;
+
+    if (!payload.content && !payload.embeds && !hasFile) {
+      showStatus("Please provide message content, fill in the embed, or attach a file.", false);
       return;
     }
 
     try {
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
+      let requestOptions = {};
+
+      if (hasFile) {
+        // Use multipart/form-data when sending attached files
+        const formData = new FormData();
+        formData.append('payload_json', JSON.stringify(payload));
+        formData.append('file', fileInput.files[0]);
+
+        requestOptions = {
+          method: 'POST',
+          body: formData
+        };
+      } else {
+        // Standard JSON request
+        requestOptions = {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        };
+      }
+
+      const response = await fetch(webhookUrl, requestOptions);
 
       if (response.ok || response.status === 204) {
         showStatus("Message sent successfully!", true);
