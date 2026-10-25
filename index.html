@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Yapin Webhook Dispatcher</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent-color: #6366f1;
+      --text-color: #f8fafc;
+      --subtext-color: #94a3b8;
+      --border-color: #334155;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 650px;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+    }
+
+    h2 {
+      margin-top: 0;
+      color: var(--accent-color);
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--subtext-color);
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 10px;
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-color);
+      box-sizing: border-box;
+      font-size: 0.95rem;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .embed-section {
+      border: 1px dashed var(--border-color);
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 20px;
+      background: rgba(15, 23, 42, 0.4);
+    }
+
+    .flex-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .color-picker {
+      height: 40px;
+      padding: 2px;
+      cursor: pointer;
+    }
+
+    button {
+      width: 100%;
+      background-color: var(--accent-color);
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: background 0.2s ease;
+    }
+
+    button:hover {
+      background-color: #4f46e5;
+    }
+
+    #status {
+      margin-top: 15px;
+      font-size: 0.9rem;
+      text-align: center;
+      padding: 8px;
+      border-radius: 4px;
+      display: none;
+    }
+
+    .status-success {
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+    }
+
+    .status-error {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>🗣️ Yapin Webhook Sender</h2>
+  
+  <div class="form-group">
+    <label for="webhookUrl">Webhook URL *</label>
+    <input type="url" id="webhookUrl" placeholder="https://your-yapin-server.com/api/webhooks/..." required />
+  </div>
+
+  <div class="form-group">
+    <label for="username">Bot Display Name</label>
+    <input type="text" id="username" placeholder="Yapin Bot" />
+  </div>
+
+  <div class="form-group">
+    <label for="avatarUrl">Avatar Image URL</label>
+    <input type="url" id="avatarUrl" placeholder="https://example.com/avatar.png" />
+  </div>
+
+  <div class="form-group">
+    <label for="content">Main Message Content</label>
+    <textarea id="content" placeholder="Type your yapping message here..."></textarea>
+  </div>
+
+  <!-- EMBED BUILDER SECTION -->
+  <div class="embed-section">
+    <label style="font-size: 1rem; color: #fff; margin-bottom: 12px;">Rich Embed Card</label>
+    
+    <div class="flex-row">
+      <div class="form-group" style="flex: 1;">
+        <label for="embedTitle">Embed Title</label>
+        <input type="text" id="embedTitle" placeholder="Announcement" />
+      </div>
+      <div class="form-group" style="width: 80px;">
+        <label for="embedColor">Color</label>
+        <input type="color" id="embedColor" class="color-picker" value="#6366f1" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="embedDesc">Embed Description</label>
+      <textarea id="embedDesc" placeholder="Embed body content..."></textarea>
+    </div>
+
+    <div class="flex-row">
+      <div class="form-group" style="flex: 1;">
+        <label for="fieldTitle">Field Title</label>
+        <input type="text" id="fieldTitle" placeholder="Key Feature" />
+      </div>
+      <div class="form-group" style="flex: 1;">
+        <label for="fieldValue">Field Value</label>
+        <input type="text" id="fieldValue" placeholder="Awesome Detail" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="embedFooter">Footer Text</label>
+      <input type="text" id="embedFooter" placeholder="Sent via Yapin Webhook Web" />
+    </div>
+  </div>
+
+  <button onclick="sendWebhook()">Send Message</button>
+  <div id="status"></div>
+</div>
+
+<script>
+  async function sendWebhook() {
+    const webhookUrl = document.getElementById('webhookUrl').value.trim();
+    const statusDiv = document.getElementById('status');
+
+    if (!webhookUrl) {
+      showStatus("Please enter a valid Webhook URL.", false);
+      return;
+    }
+
+    // Convert hex color string to integer (Standard Webhook format)
+    const hexColor = document.getElementById('embedColor').value.replace('#', '');
+    const colorInt = parseInt(hexColor, 16);
+
+    // Build Payload
+    const payload = {};
+
+    const username = document.getElementById('username').value.trim();
+    const avatarUrl = document.getElementById('avatarUrl').value.trim();
+    const content = document.getElementById('content').value.trim();
+
+    if (username) payload.username = username;
+    if (avatarUrl) payload.avatar_url = avatarUrl;
+    if (content) payload.content = content;
+
+    // Check if embed fields have content
+    const embedTitle = document.getElementById('embedTitle').value.trim();
+    const embedDesc = document.getElementById('embedDesc').value.trim();
+    const fieldTitle = document.getElementById('fieldTitle').value.trim();
+    const fieldValue = document.getElementById('fieldValue').value.trim();
+    const embedFooter = document.getElementById('embedFooter').value.trim();
+
+    if (embedTitle || embedDesc || fieldTitle || embedFooter) {
+      const embed = {
+        color: colorInt
+      };
+
+      if (embedTitle) embed.title = embedTitle;
+      if (embedDesc) embed.description = embedDesc;
+      if (embedFooter) embed.footer = { text: embedFooter };
+      
+      if (fieldTitle && fieldValue) {
+        embed.fields = [
+          {
+            name: fieldTitle,
+            value: fieldValue,
+            inline: true
+          }
+        ];
+      }
+
+      payload.embeds = [embed];
+    }
+
+    // Ensure payload isn't completely empty
+    if (!payload.content && !payload.embeds) {
+      showStatus("Please provide message content or fill in the embed details.", false);
+      return;
+    }
+
+    try {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok || response.status === 204) {
+        showStatus("Message sent successfully!", true);
+      } else {
+        const errorText = await response.text();
+        showStatus(`Error (${response.status}): ${errorText || 'Failed to send'}`, false);
+      }
+    } catch (err) {
+      showStatus(`Network Error: ${err.message}`, false);
+    }
+  }
+
+  function showStatus(message, isSuccess) {
+    const statusDiv = document.getElementById('status');
+    statusDiv.style.display = 'block';
+    statusDiv.innerText = message;
+    statusDiv.className = isSuccess ? 'status-success' : 'status-error';
+  }
+</script>
+
+</body>
+</html>
