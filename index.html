@@ -74,6 +74,70 @@
       font-weight: 600;
     }
 
+    /* SAVE SLOTS PANEL */
+    .slots-container {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border-color);
+      padding: 14px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .slots-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .slots-grid {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .slot-btn {
+      background: #0f172a;
+      border: 1px solid var(--border-color);
+      color: var(--text-color);
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .slot-btn.active {
+      background: var(--accent-color);
+      border-color: var(--accent-color);
+    }
+
+    .slot-add-btn {
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px dashed var(--accent-color);
+      color: #818cf8;
+      width: 36px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+
+    .slot-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .slot-action-btn {
+      flex: 1;
+      padding: 6px;
+      font-size: 0.8rem;
+      margin-top: 0 !important;
+      background: #334155;
+    }
+
     .embed-section, .attachment-section {
       border: 1px dashed var(--border-color);
       padding: 16px;
@@ -135,6 +199,20 @@
 
 <div class="container">
   <h2>🗣️ Yapin Webhook Sender</h2>
+
+  <!-- SAVE SLOTS SYSTEM -->
+  <div class="slots-container">
+    <div class="slots-header">
+      <span class="section-title" style="margin: 0;">💾 Profile Save Slots</span>
+    </div>
+    <div class="slots-grid" id="slotsGrid">
+      <!-- Dynamically generated slots go here -->
+    </div>
+    <div class="slot-actions">
+      <button class="slot-action-btn" onclick="saveCurrentSlot()">Save to Active Slot</button>
+      <button class="slot-action-btn" onclick="clearCurrentSlot()" style="background: rgba(239,68,68,0.2); color: #f87171;">Clear Slot</button>
+    </div>
+  </div>
   
   <div class="form-group">
     <label for="webhookUrl">Webhook URL *</label>
@@ -202,7 +280,6 @@
       </div>
     </div>
 
-    <!-- EMBED IMAGES -->
     <div class="flex-row">
       <div class="form-group" style="flex: 1;">
         <label for="embedImageUrl">Embed Main Image URL</label>
@@ -225,10 +302,122 @@
 </div>
 
 <script>
+  let activeSlot = 1;
+  const DEFAULT_SLOTS_COUNT = 3;
+
+  // Initialize slots on page load
+  window.addEventListener('DOMContentLoaded', () => {
+    renderSlots();
+    loadSlotData(activeSlot);
+  });
+
+  function getStoredSlots() {
+    const stored = localStorage.getItem('yapin_webhook_slots');
+    if (stored) {
+      try { return JSON.parse(stored); } catch(e) {}
+    }
+    // Default initial slots
+    let initial = {};
+    for (let i = 1; i <= DEFAULT_SLOTS_COUNT; i++) {
+      initial[i] = { name: `Slot ${i}`, data: {} };
+    }
+    return initial;
+  }
+
+  function renderSlots() {
+    const slotsGrid = document.getElementById('slotsGrid');
+    slotsGrid.innerHTML = '';
+    const slots = getStoredSlots();
+
+    Object.keys(slots).forEach(slotId => {
+      const btn = document.createElement('button');
+      btn.className = `slot-btn ${parseInt(slotId) === activeSlot ? 'active' : ''}`;
+      btn.innerText = slots[slotId].name || `Slot ${slotId}`;
+      btn.onclick = () => switchSlot(parseInt(slotId));
+      slotsGrid.appendChild(btn);
+    });
+
+    // Add '+' button to create extra slots
+    const addBtn = document.createElement('button');
+    addBtn.className = 'slot-add-btn';
+    addBtn.innerText = '+';
+    addBtn.title = 'Add new save slot';
+    addBtn.onclick = addNewSlot;
+    slotsGrid.appendChild(addBtn);
+  }
+
+  function switchSlot(slotId) {
+    activeSlot = slotId;
+    renderSlots();
+    loadSlotData(activeSlot);
+  }
+
+  function addNewSlot() {
+    const slots = getStoredSlots();
+    const newId = Math.max(...Object.keys(slots).map(Number)) + 1;
+    slots[newId] = { name: `Slot ${newId}`, data: {} };
+    localStorage.setItem('yapin_webhook_slots', JSON.stringify(slots));
+    switchSlot(newId);
+  }
+
+  function saveCurrentSlot() {
+    const slots = getStoredSlots();
+    const currentData = {
+      webhookUrl: document.getElementById('webhookUrl').value,
+      username: document.getElementById('username').value,
+      avatarUrl: document.getElementById('avatarUrl').value,
+      content: document.getElementById('content').value,
+      messageImageUrl: document.getElementById('messageImageUrl').value,
+      embedTitle: document.getElementById('embedTitle').value,
+      embedColor: document.getElementById('embedColor').value,
+      embedDesc: document.getElementById('embedDesc').value,
+      fieldTitle: document.getElementById('fieldTitle').value,
+      fieldValue: document.getElementById('fieldValue').value,
+      embedImageUrl: document.getElementById('embedImageUrl').value,
+      embedThumbnailUrl: document.getElementById('embedThumbnailUrl').value,
+      embedFooter: document.getElementById('embedFooter').value,
+    };
+
+    // Auto-name slot using bot username or url fallback
+    let slotName = currentData.username ? `Bot: ${currentData.username}` : `Slot ${activeSlot}`;
+    slots[activeSlot] = { name: slotName, data: currentData };
+
+    localStorage.setItem('yapin_webhook_slots', JSON.stringify(slots));
+    renderSlots();
+    showStatus(`Successfully saved configuration to Slot ${activeSlot}!`, true);
+  }
+
+  function loadSlotData(slotId) {
+    const slots = getStoredSlots();
+    const slot = slots[slotId];
+    const data = slot ? slot.data : {};
+
+    document.getElementById('webhookUrl').value = data.webhookUrl || '';
+    document.getElementById('username').value = data.username || '';
+    document.getElementById('avatarUrl').value = data.avatarUrl || '';
+    document.getElementById('content').value = data.content || '';
+    document.getElementById('messageImageUrl').value = data.messageImageUrl || '';
+    document.getElementById('embedTitle').value = data.embedTitle || '';
+    document.getElementById('embedColor').value = data.embedColor || '#6366f1';
+    document.getElementById('embedDesc').value = data.embedDesc || '';
+    document.getElementById('fieldTitle').value = data.fieldTitle || '';
+    document.getElementById('fieldValue').value = data.fieldValue || '';
+    document.getElementById('embedImageUrl').value = data.embedImageUrl || '';
+    document.getElementById('embedThumbnailUrl').value = data.embedThumbnailUrl || '';
+    document.getElementById('embedFooter').value = data.embedFooter || '';
+  }
+
+  function clearCurrentSlot() {
+    const slots = getStoredSlots();
+    slots[activeSlot] = { name: `Slot ${activeSlot}`, data: {} };
+    localStorage.setItem('yapin_webhook_slots', JSON.stringify(slots));
+    loadSlotData(activeSlot);
+    renderSlots();
+    showStatus(`Cleared Slot ${activeSlot}.`, true);
+  }
+
   async function sendWebhook() {
     const webhookUrl = document.getElementById('webhookUrl').value.trim();
-    const statusDiv = document.getElementById('status');
-
     if (!webhookUrl) {
       showStatus("Please enter a valid Webhook URL.", false);
       return;
@@ -238,7 +427,6 @@
     const colorInt = parseInt(hexColor, 16);
 
     const payload = {};
-
     const username = document.getElementById('username').value.trim();
     const avatarUrl = document.getElementById('avatarUrl').value.trim();
     const content = document.getElementById('content').value.trim();
@@ -247,14 +435,12 @@
     if (username) payload.username = username;
     if (avatarUrl) payload.avatar_url = avatarUrl;
     
-    // Combine text content and direct message image link if provided
     let finalContent = content;
     if (messageImageUrl) {
       finalContent = finalContent ? `${finalContent}\n${messageImageUrl}` : messageImageUrl;
     }
     if (finalContent) payload.content = finalContent;
 
-    // Build Embed
     const embedTitle = document.getElementById('embedTitle').value.trim();
     const embedDesc = document.getElementById('embedDesc').value.trim();
     const fieldTitle = document.getElementById('fieldTitle').value.trim();
@@ -273,13 +459,7 @@
       if (embedThumbnailUrl) embed.thumbnail = { url: embedThumbnailUrl };
 
       if (fieldTitle && fieldValue) {
-        embed.fields = [
-          {
-            name: fieldTitle,
-            value: fieldValue,
-            inline: true
-          }
-        ];
+        embed.fields = [{ name: fieldTitle, value: fieldValue, inline: true }];
       }
 
       payload.embeds = [embed];
@@ -295,19 +475,12 @@
 
     try {
       let requestOptions = {};
-
       if (hasFile) {
-        // Use multipart/form-data when sending attached files
         const formData = new FormData();
         formData.append('payload_json', JSON.stringify(payload));
         formData.append('file', fileInput.files[0]);
-
-        requestOptions = {
-          method: 'POST',
-          body: formData
-        };
+        requestOptions = { method: 'POST', body: formData };
       } else {
-        // Standard JSON request
         requestOptions = {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
