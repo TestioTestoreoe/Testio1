@@ -316,7 +316,6 @@
     if (stored) {
       try { return JSON.parse(stored); } catch(e) {}
     }
-    // Default initial slots
     let initial = {};
     for (let i = 1; i <= DEFAULT_SLOTS_COUNT; i++) {
       initial[i] = { name: `Slot ${i}`, data: {} };
@@ -337,7 +336,6 @@
       slotsGrid.appendChild(btn);
     });
 
-    // Add '+' button to create extra slots
     const addBtn = document.createElement('button');
     addBtn.className = 'slot-add-btn';
     addBtn.innerText = '+';
@@ -378,7 +376,6 @@
       embedFooter: document.getElementById('embedFooter').value,
     };
 
-    // Auto-name slot using bot username or url fallback
     let slotName = currentData.username ? `Bot: ${currentData.username}` : `Slot ${activeSlot}`;
     slots[activeSlot] = { name: slotName, data: currentData };
 
@@ -432,8 +429,16 @@
     const content = document.getElementById('content').value.trim();
     const messageImageUrl = document.getElementById('messageImageUrl').value.trim();
 
-    if (username) payload.username = username;
-    if (avatarUrl) payload.avatar_url = avatarUrl;
+    if (username) {
+      payload.username = username;
+      payload.name = username; // Fallback for servers expecting 'name'
+    }
+
+    if (avatarUrl) {
+      // Send both avatar and avatar_url to ensure compatibility with Yapin's backend
+      payload.avatar = avatarUrl;
+      payload.avatar_url = avatarUrl;
+    }
     
     let finalContent = content;
     if (messageImageUrl) {
